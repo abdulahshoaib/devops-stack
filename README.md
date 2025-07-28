@@ -1,4 +1,4 @@
-# DevSecStack
+# devops-stack
 
 A pre-configured Docker Compose stack for running a self-hosted CI/CD pipeline with essential tools like GitLab, GitLab Runner, Prometheus, Grafana, SonarQube, Gitleaks, and PostgreSQL.
 

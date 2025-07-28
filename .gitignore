@@ -1,0 +1,42 @@
+# Ignore all GitLab volumes and sensitive files
+/gitlab/config/
+/gitlab/data/
+/gitlab/logs/
+
+# Ignore all Prometheus generated data (if any is added)
+/prometheus/*
+
+# Ignore PostgreSQL data volume
+/postgresql/
+
+# Ignore Grafana data (if stateful configs are added)
+/grafana/provisioning/
+/grafana/config/
+
+# Ignore GitLab Runner state
+/runner/config
+
+# Ignore SonarQube data
+/sonarqube/data/
+/sonarqube/logs/
+/sonarqube/extensions/
+/sonarqube/conf/
+
+# Ignore Gitleaks state (if any)
+/gitleaks/
+
+# Node/Docker artifacts
+node_modules/
+*.log
+.env
+.env.*
+
+# OS-specific and editor-specific
+.DS_Store
+*.swp
+*.swo
+.idea/
+.vscode/
+
+# Docker Compose override files
+docker-compose.override.yml

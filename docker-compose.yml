@@ -1,0 +1,156 @@
+services:
+
+  ###############
+  # GitLab Core #
+  ###############
+  gitlab:
+    image: gitlab/gitlab-ce:latest
+    networks:
+      - gitlab-net
+    container_name: gitlab
+    hostname: ${GITLAB_HOST}
+    privileged: true
+    cap_add:
+      - SYS_RESOURCE
+    restart: always
+    environment:
+      GITLAB_OMNIBUS_CONFIG: |
+        external_url '${GITLAB_EXTERNAL_URL}'
+        registry_external_url '${GITLAB_REGISTRY_URL}'
+        gitlab_rails['gitlab_shell_ssh_port'] = ${GITLAB_SSH_PORT}
+    ports:
+      - '${GITLAB_HTTP_PORT}:80'                    # HTTP access to GitLab Web UI
+      - '${GITLAB_HTTPS_PORT}:443'                  # HTTPS access (if TLS is enabled)
+      - '${GITLAB_SSH_HOST_PORT}:${GITLAB_SSH_PORT}' # Git over SSH (e.g., git@${GITLAB_HOST}:repo)
+      - '${GITLAB_REGISTRY_PORT}:5050'              # GitLab Container Registry (internal access)
+    volumes:
+      - './gitlab/config:/etc/gitlab'               # ./gitlab/config - Stores GitLab configuration files
+      - './gitlab/logs:/var/log/gitlab'             # ./gitlab/logs - Stores GitLab service logs
+      - './gitlab/data:/var/opt/gitlab'             # ./gitlab/data - Stores persistent app data like repos, db, registry, uploads, etc.
+
+  ################
+  # CI/CD Runner #
+  ################
+  runner:
+    image: gitlab/gitlab-runner:latest
+    container_name: gitlab-runner
+    networks:
+      - gitlab-net
+    restart: always
+    depends_on:
+      - gitlab
+    volumes:
+      - './runner/config:/etc/gitlab-runner'        # ./runner/config - Stores GitLab Runner configuration (e.g., registered runners, tokens)
+      - '/var/run/docker.sock:/var/run/docker.sock' # Gives the runner access to host Docker daemon to spawn job containers
+
+  runner-dind:
+    image: docker:20.10-dind
+    container_name: gitlab-runner-dind
+    privileged: true                                # Required for DinD (Docker-in-Docker) to work correctly
+    restart: always
+    environment:
+      DOCKER_TLS_CERTDIR: ""                        # Disable automatic TLS cert creation (simplifies local dev)
+    volumes:
+      - runner-dind-data:/var/lib/docker            # Persists Docker state and images used inside DinD
+
+  ######################
+  # Monitoring & Logs  #
+  ######################
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    restart: always
+    ports:
+      - '${PROMETHEUS_PORT}:9090'                   # Prometheus Web UI and metrics endpoint
+    volumes:
+      - './prometheus:/etc/prometheus'              # ./prometheus - Prometheus config (prometheus.yml etc.)
+      - prometheus-data:/prometheus
+
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    restart: always
+    ports:
+      - '${GRAFANA_PORT}:3030'                      # Grafana Web UI
+    volumes:
+      - ./grafana/config:/etc/grafana        # Bind mount for editable config
+      - ./grafana/provisioning:/etc/grafana/provisioning             # For datasources, dashboards, etc.
+      - grafana-data:/var/lib/grafana                                # Persists dashboards, users, settings, and data sources
+
+  ########
+  # DAST #
+  ########
+  # owasp-zap:
+  #   image: owasp/zap2docker-stable
+  #   container_name: owasp-zap
+  #   restart: always
+  #   command: zap.sh -daemon -host 0.0.0.0 -port ${ZAP_PORT}  # Start ZAP in headless daemon mode
+  #   ports:
+  #     - '${ZAP_PORT}:6000'                     # Mapped host port for accessing ZAP remotely or via API
+  #   volumes:
+  #     - ./zap/config:/home/zap/.ZAP                 # Local folder for ZAP config and session persistence
+
+  # burp-suite:
+  #   image: rev3lik/burpsuite
+  #   container_name: burp-suite
+  #   restart: always
+  #   ports:
+  #     - '${BURP_PORT}:7000'                         # GUI access (usually over VNC or exposed port depending on image)
+  #   environment:
+  #     - DISPLAY=${DISPLAY}                           # Required by X11 apps
+  #   volumes:
+  #     - ./burp:/home/burp                           # Persist user config, project data, and settings
+
+  ########
+  # SAST #
+  ########
+  gitleaks:
+    image: zricethezav/gitleaks:latest
+    container_name: gitleaks
+    entrypoint: ["gitleaks", "detect", "--source=.", "--verbose"]
+    volumes:
+      - ./gitleaks:/app                             # Mount current project folder (or your code dir) into /app
+    working_dir: /app
+
+  sonarqube:
+    image: sonarqube:community
+    container_name: sonarqube
+    restart: always
+    ports:
+      - "${SONARQUBE_PORT}:9000"                                 # SonarQube web UI
+    environment:
+      - SONARQUBE_JDBC_URL=${SONARQUBE_JDBC_URL}
+      - SONARQUBE_JDBC_USERNAME=${SONARQUBE_JDBC_USERNAME}
+      - SONARQUBE_JDBC_PASSWORD=${SONARQUBE_JDBC_PASSWORD}
+    volumes:
+      - ./sonarqube/conf:/opt/sonarqube/conf
+      - ./sonarqube/data:/opt/sonarqube/data
+      - ./sonarqube/logs:/opt/sonarqube/logs
+      - ./sonarqube/extensions:/opt/sonarqube/extensions
+    networks:
+      - gitlab-net
+
+  ############
+  # Database #
+  ############
+  db:
+    image: postgres:17.1
+    container_name: postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${SONARQUBE_JDBC_USERNAME}
+      POSTGRES_PASSWORD: ${SONARQUBE_JDBC_PASSWORD}
+      POSTGRES_DB: ${SONARQUBE_DB_NAME}
+    volumes:
+      - ./postgresql:/var/lib/postgresql/data
+    networks:
+      - gitlab-net
+
+volumes:
+  runner-dind-data:                                 # Volume to persist Docker-in-Docker's local image/cache state
+  prometheus-data:                                  # Volume for Prometheus metrics database
+  grafana-data:                                     # Volume for Grafana dashboards, users, and config
+
+networks:
+  gitlab-net:
+    driver: bridge

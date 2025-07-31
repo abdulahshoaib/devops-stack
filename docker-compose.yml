@@ -27,9 +27,6 @@ services:
       - './gitlab/config:/etc/gitlab'               # ./gitlab/config - Stores GitLab configuration files
       - './gitlab/logs:/var/log/gitlab'             # ./gitlab/logs - Stores GitLab service logs
       - './gitlab/data:/var/opt/gitlab'             # ./gitlab/data - Stores persistent app data like repos, db, registry, uploads, etc.
-    network:
-      aliases:
-        - 'hive.gitlab.com'
 
   ################
   # CI/CD Runner #

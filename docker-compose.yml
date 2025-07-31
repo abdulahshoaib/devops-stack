@@ -27,6 +27,9 @@ services:
       - './gitlab/config:/etc/gitlab'               # ./gitlab/config - Stores GitLab configuration files
       - './gitlab/logs:/var/log/gitlab'             # ./gitlab/logs - Stores GitLab service logs
       - './gitlab/data:/var/opt/gitlab'             # ./gitlab/data - Stores persistent app data like repos, db, registry, uploads, etc.
+    network:
+      aliases:
+        - 'hive.gitlab.com'
 
   ################
   # CI/CD Runner #
@@ -42,16 +45,8 @@ services:
     volumes:
       - './runner/config:/etc/gitlab-runner'        # ./runner/config - Stores GitLab Runner configuration (e.g., registered runners, tokens)
       - '/var/run/docker.sock:/var/run/docker.sock' # Gives the runner access to host Docker daemon to spawn job containers
-
-  runner-dind:
-    image: docker:20.10-dind
-    container_name: gitlab-runner-dind
-    privileged: true                                # Required for DinD (Docker-in-Docker) to work correctly
-    restart: always
     environment:
-      DOCKER_TLS_CERTDIR: ""                        # Disable automatic TLS cert creation (simplifies local dev)
-    volumes:
-      - runner-dind-data:/var/lib/docker            # Persists Docker state and images used inside DinD
+      - DOCKER_HOST=unix:///var/run/docker.sock
 
   ######################
   # Monitoring & Logs  #
@@ -147,7 +142,6 @@ services:
       - gitlab-net
 
 volumes:
-  runner-dind-data:                                 # Volume to persist Docker-in-Docker's local image/cache state
   prometheus-data:                                  # Volume for Prometheus metrics database
   grafana-data:                                     # Volume for Grafana dashboards, users, and config
 

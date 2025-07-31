@@ -5,13 +5,23 @@
 
 # Ignore all Prometheus generated data (if any is added)
 /prometheus/*
+!/prometheus/prometheus.yml
+!/prometheus/alert.rules
+!/prometheus/rules/
+!/prometheus/rules/**
 
 # Ignore PostgreSQL data volume
 /postgresql/
 
 # Ignore Grafana data (if stateful configs are added)
-/grafana/provisioning/
-/grafana/config/
+/grafana/*
+!/grafana/provisioning/
+!/grafana/provisioning/**
+
+!/grafana/config/
+!/grafana/config/provisioning/
+!/grafana/config/provisioning/**
+
 
 # Ignore GitLab Runner state
 /runner/config
